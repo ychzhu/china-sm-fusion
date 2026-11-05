@@ -3,21 +3,50 @@ message: "If you use this code, please cite the associated ESSD paper and the da
 title: "Code for the China 36 km daily soil moisture fusion dataset (SMAP V09 x in-situ network)"
 version: "2.0"
 date-released: "2026-11-03"
-# TODO: replace the placeholder author with the confirmed author list.
 authors:
-  - name: "AUTHOR PLACEHOLDER"
+  - family-names: "Zhu"
+    given-names: "Yongchao"
+  - family-names: "Wu"
+    given-names: "Dongli"
+  - family-names: "Kong"
+    given-names: "Tuanjie"
+  - family-names: "Fang"
+    given-names: "Shibo"
+  - family-names: "Wang"
+    given-names: "Lei"
+  - family-names: "Jia"
+    given-names: "Muxin"
+  - family-names: "Guo"
+    given-names: "Fengjuan"
+  - family-names: "Zhang"
+    given-names: "Peng"
 # Data archive DOI filled; TODO: replace the ESSD paper DOI once available.
 identifiers:
   - type: doi
     value: "10.57760/sciencedb.018rl"
     description: "Data archive (SCIDB) for the published NetCDF/CSV products"
-repository-code: "https://github.com/ORG/REPO"
+repository-code: "https://github.com/ychzhu/china-sm-fusion"
 license: CC-BY-4.0
 preferred-citation:
   type: article
   title: "China 36 km daily soil moisture fusion dataset (SMAP V09 x in-situ network)"
   authors:
-    - name: "AUTHOR PLACEHOLDER"
+    - family-names: "Zhu"
+      given-names: "Yongchao"
+    - family-names: "Wu"
+      given-names: "Dongli"
+    - family-names: "Kong"
+      given-names: "Tuanjie"
+    - family-names: "Fang"
+      given-names: "Shibo"
+    - family-names: "Wang"
+      given-names: "Lei"
+    - family-names: "Jia"
+      given-names: "Muxin"
+    - family-names: "Guo"
+      given-names: "Fengjuan"
+    - family-names: "Zhang"
+      given-names: "Peng"
   year: 2026
   journal: "Earth System Science Data"
   doi: "10.0000/PLACEHOLDER-PAPER-DOI"

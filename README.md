@@ -14,8 +14,8 @@ data products are downloaded separately (see [Data availability](#data-availabil
 
 ```bash
 # 1. clone and enter the repository
-git clone https://github.com/ORG/REPO.git
-cd REPO
+git clone https://github.com/ychzhu/china-sm-fusion.git
+cd china-sm-fusion
 
 # 2. install dependencies (Python 3.9+; a virtual environment is recommended)
 pip install -r requirements.txt
