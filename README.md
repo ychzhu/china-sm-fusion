@@ -96,7 +96,7 @@ non-ASCII paths.
 
 ## Data availability
 
-The released NetCDF/CSV data (~1.2 GB) are archived separately and cited by DOI;
+The released NetCDF/CSV data (~596 MB) are archived separately and cited by DOI;
 they are intentionally not committed here. Download instructions and the expected
 folder layout are in [`data/README.md`](data/README.md). The raw CMA station data
 are restricted; the quality-controlled station products used in the paper are

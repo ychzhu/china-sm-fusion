@@ -1,6 +1,6 @@
 # Download the published data here
 
-The data files are **not stored in this Git repository** (they total about 1.2 GB
+The data files are **not stored in this Git repository** (they total about 596 MB
 and GitHub is intended for code). Download the released data package from the
 data archive and place its contents in this `data/` folder, keeping the folder
 names below.
