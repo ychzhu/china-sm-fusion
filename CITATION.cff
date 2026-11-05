@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the associated ESSD paper and the data archive."
+title: "Code for the China 36 km daily soil moisture fusion dataset (SMAP V09 x in-situ network)"
+version: "2.0"
+date-released: "2026-11-03"
+# TODO: replace the placeholder author with the confirmed author list.
+authors:
+  - name: "AUTHOR PLACEHOLDER"
+# Data archive DOI filled; TODO: replace the ESSD paper DOI once available.
+identifiers:
+  - type: doi
+    value: "10.57760/sciencedb.018rl"
+    description: "Data archive (SCIDB) for the published NetCDF/CSV products"
+repository-code: "https://github.com/ORG/REPO"
+license: CC-BY-4.0
+preferred-citation:
+  type: article
+  title: "China 36 km daily soil moisture fusion dataset (SMAP V09 x in-situ network)"
+  authors:
+    - name: "AUTHOR PLACEHOLDER"
+  year: 2026
+  journal: "Earth System Science Data"
+  doi: "10.0000/PLACEHOLDER-PAPER-DOI"

@@ -1,0 +1,36 @@
+# ---- Regenerated working arrays (the pipeline rebuilds these) ----
+code/python/work/
+code/python/work_full/
+code/matlab/full/work_full/
+
+# ---- Published data: downloaded separately from the data archive ----
+# Keep this folder's README but ignore every downloaded data file.
+data/*
+!data/README.md
+
+# ---- Operational MATLAB run directories (not present in the public repo) ----
+code/state/
+code/logs/
+code/fusionV09/
+code/smapV09/
+code/figs/
+
+# ---- Python build artifacts ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# ---- Backups, logs and temporary files ----
+*.bak
+*.log
+~$*
+*.tmp
+nc_stage/
+shot/
+
+# ---- OS / editor cruft ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
