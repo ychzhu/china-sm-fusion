@@ -11,9 +11,10 @@ import runpy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 steps = [
-    "s0_build_raw.py", "s1_stage1.py", "s2_stage2_tca.py", "s3_stage3.py",
-    "s4_grid_agg.py", "s5_neighbors.py", "s6_cdf.py", "s7_fusion.py",
-    "s8_eval_direct.py", "s9_cv.py", "s10_compare_refs.py",
+    "s0_build_raw.py", "s1_stage1.py", "s2_stage2_tca.py", "s2b_tca_sensitivity.py",
+    "s3_stage3.py", "s4_grid_agg.py", "s5_neighbors.py", "s6_cdf.py", "s7_fusion.py",
+    "s8_eval_direct.py", "s9_cv.py", "s10_compare_refs.py", "s12_stratified_metrics.py",
+    "s11_export_release.py", "s13_release_metrics.py", "s14_package_release.py",
 ]
 for step in steps:
     print("\n########## running %s ##########" % step)

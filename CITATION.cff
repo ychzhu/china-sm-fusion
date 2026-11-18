@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this code, please cite the associated ESSD paper and the data archive."
 title: "Code for the China 36 km daily soil moisture fusion dataset (SMAP V09 x in-situ network)"
 version: "2.0"
-date-released: "2026-11-03"
+date-released: "2026-11-18"
 authors:
   - family-names: "Zhu"
     given-names: "Yongchao"
@@ -14,6 +14,8 @@ authors:
     given-names: "Shibo"
   - family-names: "Wang"
     given-names: "Lei"
+  - family-names: "Shi"
+    given-names: "Yaohui"
   - family-names: "Jia"
     given-names: "Muxin"
   - family-names: "Guo"
@@ -41,6 +43,8 @@ preferred-citation:
       given-names: "Shibo"
     - family-names: "Wang"
       given-names: "Lei"
+    - family-names: "Shi"
+      given-names: "Yaohui"
     - family-names: "Jia"
       given-names: "Muxin"
     - family-names: "Guo"
@@ -49,4 +53,4 @@ preferred-citation:
       given-names: "Peng"
   year: 2026
   journal: "Earth System Science Data"
-  doi: "10.0000/PLACEHOLDER-PAPER-DOI"
+  # Add the ESSD paper DOI after it is assigned.

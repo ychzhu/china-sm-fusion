@@ -1,28 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Full-domain station-level comparison against independent references."""
+"""Station and gridded comparisons with ERA5/GLDAS roles explicitly separated."""
 from paths_full import *
+from validation_utils import metrics, map_stations
 
+import csv
+import json
 import os
 import numpy as np
 import netCDF4
-from scipy.spatial import cKDTree
-
-
-g = np.load(os.path.join(WORK, "grid_prep_full.npz"), allow_pickle=True)
-glat, glon, common_ymd = g["glat"], g["glon"], g["common_ymd"]
-smap_bg = g["smap_bg"]
-smap_cdf = np.load(os.path.join(WORK, "smap_cdf_full.npy"))
-fusion = np.load(os.path.join(WORK, "fusion_full.npy"))
-
-slat = np.load(os.path.join(WORK, "lat3596.npy"))
-slon = np.load(os.path.join(WORK, "lon3596.npy"))
-cleaned = np.load(os.path.join(WORK, "obj_clean3596.npy"))
-sta_ymd = station_axis_ymd()
-sta_pos = {d: i for i, d in enumerate(sta_ymd)}
-sta_obs = cleaned[:, np.array([sta_pos[d] for d in common_ymd])]
-
-_, ng = cKDTree(np.column_stack([glat, glon])).query(
-    np.column_stack([slat, slon]), k=1)
 
 
 def open_nc(path):
@@ -30,29 +15,105 @@ def open_nc(path):
         return netCDF4.Dataset(os.path.basename(path), memory=fh.read())
 
 
-def load_ref(rel):
-    rds = open_nc(rel)
-    rymd = rds.variables["time_ymd"][:].astype(str)
-    rsm = np.ma.filled(rds.variables["sm"][:], np.nan).astype(float)
-    rds.close()
-    rmap = {d: i for i, d in enumerate(rymd)}
-    return rsm[np.array([rmap[d] for d in common_ymd])]
+def load_ref(path, common_ymd):
+    ds = open_nc(path)
+    ymd = ds.variables["time_ymd"][:].astype(str)
+    values = np.ma.filled(ds.variables["sm"][:], np.nan).astype(float)
+    ds.close()
+    pos = {d: i for i, d in enumerate(ymd)}
+    return values[np.array([pos[d] for d in common_ymd])]
 
 
-era5 = load_ref(os.path.join(REFERENCE, "era5_gcs_swvl1_36km_20150331_20261001.nc"))
-gldas = load_ref(os.path.join(REFERENCE, "gldas_noah_soilm_36km_20150331_20261001.nc"))
+def write_rows(path, fieldnames, rows):
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
+
+g = np.load(os.path.join(WORK, "grid_prep_full.npz"), allow_pickle=True)
+glat, glon, common_ymd, members = g["glat"], g["glon"], g["common_ymd"], g["members"]
+smap_bg = g["smap_bg"]
+smap_cdf = np.load(os.path.join(WORK, "smap_cdf_full.npy"))
+fusion = np.load(os.path.join(WORK, "fusion_full.npy"))
+era5 = load_ref(os.path.join(REFERENCE, "era5_gcs_swvl1_36km_20150331_20261001.nc"), common_ymd)
+gldas = load_ref(os.path.join(REFERENCE, "gldas_noah_soilm_36km_20150331_20261001.nc"), common_ymd)
+
+slat = np.load(os.path.join(WORK, "lat3596.npy"))
+slon = np.load(os.path.join(WORK, "lon3596.npy"))
+cleaned = np.load(os.path.join(WORK, "obj_clean3596.npy"))
+sta_ymd = station_axis_ymd()
+pos = {d: i for i, d in enumerate(sta_ymd)}
+sta_obs = cleaned[:, np.array([pos[d] for d in common_ymd])]
+s2g, assigned, _ = map_stations(members, glat, glon, slat, slon)
 systems = {
-    "GLDAS": gldas[:, ng], "ERA5": era5[:, ng],
-    "SMAP_raw": smap_bg[:, ng], "SMAP_CDF": smap_cdf[:, ng],
-    "Fusion": fusion[:, ng]}
+    "GLDAS": gldas[:, s2g].T, "ERA5": era5[:, s2g].T,
+    "SMAP_raw": smap_bg[:, s2g].T, "SMAP_CDF": smap_cdf[:, s2g].T,
+    "Fusion": fusion[:, s2g].T,
+}
+rows = []
+for scope, select in (("inside", assigned), ("outside", ~assigned), ("all", np.ones(len(slat), bool))):
+    obs = sta_obs[select]
+    for name, arr in systems.items():
+        values = arr[select]
+        valid = np.isfinite(values) & np.isfinite(obs)
+        row = {"scope": scope, "system": name, "mask": "native pair availability"}
+        row.update(metrics(values[valid], obs[valid]))
+        rows.append(row)
+write_rows(os.path.join(WORK, "reference_station_metrics_by_scope.csv"),
+           ["scope", "system", "mask", "N", "MAE", "RMSE", "BIAS", "CORR"], rows)
 
-print("system vs station observations (pooled station-day pairs)")
-for name, arr in systems.items():
-    a = arr.T
-    valid = np.isfinite(a) & np.isfinite(sta_obs)
-    x, y = a[valid], sta_obs[valid]
-    d = x - y
-    print("%-9s N=%9d MAE=%.4f RMSE=%.4f BIAS=%+.4f CORR=%.4f" %
-          (name, len(x), np.mean(np.abs(d)), np.sqrt(np.mean(d ** 2)),
-           np.mean(d), np.corrcoef(x, y)[0, 1]))
+rows = []
+for scope, select in (("inside", assigned), ("outside", ~assigned), ("all", np.ones(len(slat), bool))):
+    obs = sta_obs[select]
+    joint = np.isfinite(obs)
+    for arr in systems.values():
+        joint &= np.isfinite(arr[select])
+    for name, arr in systems.items():
+        values = arr[select]
+        row = {"scope": scope, "system": name, "mask": "joint five-system availability"}
+        row.update(metrics(values[joint], obs[joint]))
+        rows.append(row)
+write_rows(os.path.join(WORK, "reference_station_metrics_joint.csv"),
+           ["scope", "system", "mask", "N", "MAE", "RMSE", "BIAS", "CORR"], rows)
+
+# Gridded reference comparisons: BIAS = reference - product.
+pairs = [("ERA5_vs_SMAP_raw", era5, smap_bg), ("ERA5_vs_Fusion", era5, fusion),
+         ("GLDAS_vs_SMAP_raw", gldas, smap_bg), ("GLDAS_vs_Fusion", gldas, fusion),
+         ("SMAP_raw_vs_Fusion", smap_bg, fusion)]
+rows, pergrid = [], []
+for name, ref, product in pairs:
+    valid = np.isfinite(ref) & np.isfinite(product)
+    diff = ref[valid] - product[valid]
+    row = {"Pair": name, "N": int(valid.sum()),
+           "MAE": float(np.mean(np.abs(diff))),
+           "RMSE": float(np.sqrt(np.mean(diff ** 2))),
+           "BIAS": float(np.mean(diff)),
+           "CORR": float(np.corrcoef(ref[valid], product[valid])[0, 1])}
+    rows.append(row)
+    cell_metrics = []
+    for gi in range(ref.shape[1]):
+        ok = valid[:, gi]
+        if ok.sum() < 60:
+            continue
+        d = ref[ok, gi] - product[ok, gi]
+        cell_metrics.append((np.mean(np.abs(d)), np.sqrt(np.mean(d ** 2)),
+                             np.mean(d), np.corrcoef(ref[ok, gi], product[ok, gi])[0, 1]))
+    cell_metrics = np.asarray(cell_metrics)
+    pergrid.append({"Pair": name, "ValidGrids": int(len(cell_metrics)),
+                    "MAE_median": float(np.median(cell_metrics[:, 0])),
+                    "RMSE_median": float(np.median(cell_metrics[:, 1])),
+                    "BIAS_median": float(np.median(cell_metrics[:, 2])),
+                    "CORR_median": float(np.median(cell_metrics[:, 3]))})
+write_rows(os.path.join(WORK, "stats_smap_fusion.csv"),
+           ["Pair", "N", "MAE", "RMSE", "BIAS", "CORR"], rows)
+write_rows(os.path.join(WORK, "stats_smap_fusion_pergrid.csv"),
+           ["Pair", "ValidGrids", "MAE_median", "RMSE_median", "BIAS_median", "CORR_median"], pergrid)
+roles = {
+    "ERA5": "third-party reanalysis; used in TCA calibration, therefore not a fully independent validation reference",
+    "GLDAS": "third-party reanalysis; not used in TCA calibration or fusion; relative independence is clearer",
+    "validation_masks": "native pair availability and joint five-system availability are reported separately",
+}
+with open(os.path.join(WORK, "reference_roles.json"), "w", encoding="utf-8") as fh:
+    json.dump(roles, fh, ensure_ascii=False, indent=2)
+print("saved station native/joint metrics and gridded reference tables")

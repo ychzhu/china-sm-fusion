@@ -25,7 +25,7 @@ STATION = os.path.join(DATA, "station")
 SMAP = os.path.join(DATA, "smap_v09")
 FUSION = os.path.join(DATA, "fusion")
 REFERENCE = os.path.join(DATA, "reference")
-WORK = os.path.join(PYDIR, "work_full")
+WORK = os.environ.get("SM_WORK_DIR", os.path.join(PYDIR, "work_full"))
 os.makedirs(WORK, exist_ok=True)
 
 # Authoritative released NetCDFs (3596 domain).

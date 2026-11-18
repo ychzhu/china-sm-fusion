@@ -5,7 +5,8 @@ fusion dataset** described in the accompanying *Earth System Science Data*
 paper. It combines NASA SMAP L3 SPL3SMP V009 retrievals with the China
 Meteorological Administration (CMA) in-situ network over mainland China for
 2015–2026, using a three-stage quality control and a reference-free Triple
-Collocation error calibration.
+Collocation error calibration. Version 2 uses day-specific observation errors,
+standard OI posterior uncertainty, and station-grouped spatial cross-validation.
 
 This repository contains **code and small static resources only**. The large
 data products are downloaded separately (see [Data availability](#data-availability)).
@@ -51,7 +52,7 @@ non-ASCII paths.
 │   ├── ndvi/                    MODIS NDVI download and stratification
 │   ├── resources/               small (<1 MB) geometry/error files (.mat)
 │   ├── python/
-│   │   ├── full/                authoritative full-domain pipeline (s0–s10)
+│   │   ├── full/                authoritative V2 full-domain pipeline (s0–s14)
 │   │   ├── p1–p4 + run_pipeline.py   dependency-free Python port (2909 domain)
 │   │   ├── eval_direct.py / cv_10fold.py / compare_refs.py
 │   │   └── work, work_full/     regenerated intermediates (git-ignored)
@@ -74,21 +75,27 @@ non-ASCII paths.
    - **Stage 3 — sigma-driven decisions**: extreme errors are down-weighted and
      only hard-dropped with independent objective evidence, avoiding circularity.
 2. **Grid aggregation** of stations to the 36 km SMAP EASE-Grid 2.0 cells
-   (0.18° search radius), propagating per-station errors under the empirically
-   verified rho = 0 (independent errors) assumption.
+   (0.18° search radius), using the stations actually valid on each day and
+   propagating their errors under the empirically verified rho = 0 assumption.
 3. **CDF bias correction** of the SMAP background where at least three
-   neighbouring grids are available.
+   neighbouring grids are available; each cross-validation fold rebuilds its
+   transfer functions from training-grid observations only.
 4. **Optimal interpolation** with an exponential background-error correlation
-   and TCA-derived observation-error weights, producing daily fused fields and
-   uncertainties.
+   (`a=10`, `R=1.08°`, at most nine neighbours), daily observation-error weights,
+   and the standard OI posterior error `Aerr=sqrt(max(A0²-B²/A0²,0))`.
 
 ## Reproducing the paper results
 
-- **Full-domain pipeline (recommended):** `python code/python/full/run_pipeline_full.py`
-  runs stages s0–s10, including direct validation, 10-fold cross-validation and
-  the five-system reference comparison.
-- **Read-back verification:** `python code/verify_release.py` recomputes the
-  quantitative claims from the shipped files and exits 0 only when all pass.
+- **Full-domain V2 pipeline (recommended):** `python code/python/full/run_pipeline_full.py`
+  runs stages s0–s14, including TCA sensitivity, direct inside/outside-grid validation,
+  leakage-controlled station-grouped 10-fold CV, native and common-mask five-system
+  comparisons, stratified metrics, NetCDF export, and release packaging.
+- **Path overrides:** set `SM_DATA_DIR` to the extracted archive root,
+  `SM_WORK_DIR` to a writable intermediate directory, and `SM_RELEASE_DIR` to the
+  release-package root when they differ from the repository defaults.
+- **Read-back verification:** stage s14 independently reads the exported NetCDF and
+  writes `validation/verify_report.txt` plus `validation/SHA256SUMS.csv`; it exits
+  nonzero if the independent checks fail.
 - **MATLAB:** the canonical product code (R2022b + Mapping Toolbox) is in
   `code/core/`; run `code/run_all.m`. `config.m` supports both the operational
   project layout and this standalone repository (auxiliary files in
@@ -105,8 +112,7 @@ included in the data archive.
 ## Citation
 
 Please cite the ESSD paper and the data archive when using this code. See
-[`CITATION.cff`](CITATION.cff) (author and DOI entries are placeholders pending
-the final publication metadata).
+[`CITATION.cff`](CITATION.cff) (the ESSD paper DOI will be added after assignment).
 
 ## License
 
