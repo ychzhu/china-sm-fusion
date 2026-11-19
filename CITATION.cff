@@ -1,6 +1,6 @@
 cff-version: 1.2.0
-message: "If you use this code, please cite the associated ESSD paper and the data archive."
-title: "Code for the China 36 km daily soil moisture fusion dataset (SMAP V09 x in-situ network)"
+message: "If you use this code, please cite the data archive and the companion ESSD paper."
+title: "Code for the China 36 km daily surface soil moisture fusion dataset (SMAP V09 and the CMA in-situ network)"
 version: "2.0"
 date-released: "2026-11-18"
 authors:
@@ -22,16 +22,22 @@ authors:
     given-names: "Fengjuan"
   - family-names: "Zhang"
     given-names: "Peng"
-# Data archive DOI filled; TODO: replace the ESSD paper DOI once available.
 identifiers:
   - type: doi
     value: "10.57760/sciencedb.018rl"
-    description: "Data archive (SCIDB) for the published NetCDF/CSV products"
+    description: "Data archive for the published NetCDF and CSV products"
 repository-code: "https://github.com/ychzhu/china-sm-fusion"
 license: CC-BY-4.0
+keywords:
+  - soil moisture
+  - SMAP
+  - optimal interpolation
+  - CDF matching
+  - triple collocation
+  - China
 preferred-citation:
   type: article
-  title: "China 36 km daily soil moisture fusion dataset (SMAP V09 x in-situ network)"
+  title: "A 36-km daily surface soil moisture dataset over China (2015-2026) from SMAP V09 retrievals merged with in-situ observations by CDF matching and optimal interpolation"
   authors:
     - family-names: "Zhu"
       given-names: "Yongchao"
@@ -53,4 +59,4 @@ preferred-citation:
       given-names: "Peng"
   year: 2026
   journal: "Earth System Science Data"
-  # Add the ESSD paper DOI after it is assigned.
+  # DOI to be added after acceptance; the manuscript is in review.

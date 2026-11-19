@@ -1,120 +1,101 @@
-# China 36 km Daily Soil Moisture Fusion — Code
+# China 36 km Daily Surface Soil Moisture Fusion — Code
 
-Reproducible code for the **China 36 km daily surface soil-moisture (10 cm)
-fusion dataset** described in the accompanying *Earth System Science Data*
-paper. It combines NASA SMAP L3 SPL3SMP V009 retrievals with the China
-Meteorological Administration (CMA) in-situ network over mainland China for
-2015–2026, using a three-stage quality control and a reference-free Triple
-Collocation error calibration. Version 2 uses day-specific observation errors,
-standard OI posterior uncertainty, and station-grouped spatial cross-validation.
+Reproducible code for the **China 36 km daily surface soil moisture (0–10 cm) fusion
+dataset** described in the companion *Earth System Science Data* paper. The pipeline
+combines NASA SMAP L3 (SPL3SMP V009) retrievals with the China Meteorological
+Administration (CMA) in-situ network over mainland China for 2015–2026, using a
+three-stage quality control, a reference-free triple-collocation error calibration,
+per-cell CDF bias correction and optimal interpolation.
 
-This repository contains **code and small static resources only**. The large
-data products are downloaded separately (see [Data availability](#data-availability)).
+The dataset itself is archived at **https://doi.org/10.57760/sciencedb.018rl** (CC BY 4.0).
 
 ## Quick start
 
 ```bash
-# 1. clone and enter the repository
 git clone https://github.com/ychzhu/china-sm-fusion.git
 cd china-sm-fusion
-
-# 2. install dependencies (Python 3.9+; a virtual environment is recommended)
 pip install -r requirements.txt
-
-# 3. download the released data package into ./data (see data/README.md)
-#    expected: data/station, data/smap_v09, data/fusion, data/reference, ...
-
-# 4. run the authoritative full-domain (3596) pipeline
+# place the extracted data archive so that data/station, data/smap_v09, data/fusion exist
 python code/python/full/run_pipeline_full.py
 ```
 
-All paths are resolved relative to the scripts and NetCDFs are read through
-in-memory buffers, so the pipeline runs from any working directory and on
+All paths are resolved relative to the scripts, and NetCDF files are read through
+in-memory buffers, so the pipeline runs from any working directory and survives
 non-ASCII paths.
 
 ## Repository layout
 
 ```
-.
-├── code/
-│   ├── config.m                 central MATLAB configuration (paths, parameters)
-│   ├── run_all.m                MATLAB master entry (preprocess -> oi_fusion)
-│   ├── core/                    canonical MATLAB processing stages
-│   │   ├── preprocess.m         station QC -> TCA aggregation -> SMAP CDF
-│   │   └── oi_fusion.m          optimal interpolation (analysis + error)
-│   ├── lib/                     helper functions (station QC, CDF, logging)
-│   ├── validation/              scripts behind every number in the paper
-│   │   ├── tca_station_error.py Triple Collocation error calibration
-│   │   ├── qc_seasonal.py       seasonal active-window QC (full 3596 domain)
-│   │   ├── cv_10fold.m/.py      10-fold spatial cross-validation
-│   │   └── hl_background_correlation.m  Hollingsworth–Lonnberg correlation
-│   ├── reference/               independent ERA5 / GLDAS validation + downloaders
-│   ├── ndvi/                    MODIS NDVI download and stratification
-│   ├── resources/               small (<1 MB) geometry/error files (.mat)
-│   ├── python/
-│   │   ├── full/                authoritative V2 full-domain pipeline (s0–s14)
-│   │   ├── p1–p4 + run_pipeline.py   dependency-free Python port (2909 domain)
-│   │   ├── eval_direct.py / cv_10fold.py / compare_refs.py
-│   │   └── work, work_full/     regenerated intermediates (git-ignored)
-│   └── verify_release.py        self-contained read-back verifier
-├── data/                        downloaded data (git-ignored; see data/README.md)
-├── requirements.txt
-├── CITATION.cff
-└── LICENSE
+code/
+├── python/full/          authoritative full-domain (3,596-station) pipeline, stages s0–s10
+├── matlab/full/          stage-by-stage MATLAB port producing the same products
+├── validation/           parameter sensitivity, fold-specific CV and error-field reliability
+├── lib/                  rank-based CDF matching shared by the MATLAB chain
+├── reference/download/   downloaders and preprocessing for ERA5 and GLDAS
+├── ndvi/                 MOD13C2 download and stratification
+└── resources/            small geometry files (<1 MB)
+data/                     extracted release (git-ignored; see data/README.md)
 ```
 
-## Methodology overview
+## Pipeline stages
 
-1. **Three-stage quality control**, applied independently per station-year so a
-   later sensor drift cannot remove good early data:
-   - **Stage 1 — objective hard-fault screening** (physical range, flatline/stuck,
-     jumps, active-window completeness, spatial consistency; no error estimate).
-   - **Stage 2 — Triple Collocation** on the cleaned station + SMAP + ERA5 triplet
-     (minimum 100 common days, positive-variance gate), giving per-station error
-     standard deviations without treating any product as truth.
-   - **Stage 3 — sigma-driven decisions**: extreme errors are down-weighted and
-     only hard-dropped with independent objective evidence, avoiding circularity.
-2. **Grid aggregation** of stations to the 36 km SMAP EASE-Grid 2.0 cells
-   (0.18° search radius), using the stations actually valid on each day and
-   propagating their errors under the empirically verified rho = 0 assumption.
-3. **CDF bias correction** of the SMAP background where at least three
-   neighbouring grids are available; each cross-validation fold rebuilds its
-   transfer functions from training-grid observations only.
-4. **Optimal interpolation** with an exponential background-error correlation
-   (`a=10`, `R=1.08°`, at most nine neighbours), daily observation-error weights,
-   and the standard OI posterior error `Aerr=sqrt(max(A0²-B²/A0²,0))`.
+| Stage | What it does |
+|---|---|
+| s0 | Build the 3,596 × 4,290 raw station matrix from the yearly files |
+| s1 | Stage 1 objective hard-fault screening (no error estimate) |
+| s2 | Stage 2 triple collocation on the station–SMAP–ERA5 triplet |
+| s3 | Stage 3 error-driven decisions (extreme threshold 0.1074) |
+| s4 | Station-to-grid aggregation and cell error |
+| s5 | Deterministic capped neighbour selection |
+| s6 | Rank-based CDF adjustment of the SMAP background |
+| s7 | Optimal-interpolation fusion with daily observation error |
+| s8 | In-sample pooled evaluation |
+| s9 | Ten-fold spatial cross-validation |
+| s10 | Five-system reference comparison |
 
-## Reproducing the paper results
+## Reproducing the paper
 
-- **Full-domain V2 pipeline (recommended):** `python code/python/full/run_pipeline_full.py`
-  runs stages s0–s14, including TCA sensitivity, direct inside/outside-grid validation,
-  leakage-controlled station-grouped 10-fold CV, native and common-mask five-system
-  comparisons, stratified metrics, NetCDF export, and release packaging.
-- **Path overrides:** set `SM_DATA_DIR` to the extracted archive root,
-  `SM_WORK_DIR` to a writable intermediate directory, and `SM_RELEASE_DIR` to the
-  release-package root when they differ from the repository defaults.
-- **Read-back verification:** stage s14 independently reads the exported NetCDF and
-  writes `validation/verify_report.txt` plus `validation/SHA256SUMS.csv`; it exits
-  nonzero if the independent checks fail.
-- **MATLAB:** the canonical product code (R2022b + Mapping Toolbox) is in
-  `code/core/`; run `code/run_all.m`. `config.m` supports both the operational
-  project layout and this standalone repository (auxiliary files in
-  `code/resources/`).
+| Result | Script |
+|---|---|
+| Main tables 1–4, 6 and the panels of Figs. 3–9 | `code/python/full/run_pipeline_full.py` (s8–s10) |
+| Table 5, parameter sensitivity (21 variants) | `code/validation/sens_all.m` |
+| Table 6 and Tables S5–S6, strict CV | `code/validation/t_cv_official3.m` |
+| Tables S9 and Fig. S4, posterior error reliability | `code/validation/t_aerr.m` |
+| Fig. S1, coverage | `code/validation/make_si_figs.m` |
+| Fig. S2, within-cell station differences | `code/validation/make_si_fig3.m` |
+
+The sensitivity scripts need the intermediate matrices produced by stages s0–s5; see
+`code/validation/README.md` for the exact prerequisites and for the variant tags.
+
+## Requirements
+
+- **Python** 3.9+ with numpy, scipy, pandas, netCDF4 and h5py. No MATLAB is required.
+- **MATLAB** R2022b or later for the MATLAB port and the sensitivity scripts. Only base
+  functions are used apart from `lib/cdf_adjusting2.m`.
 
 ## Data availability
 
-The released NetCDF/CSV data (~596 MB) are archived separately and cited by DOI;
-they are intentionally not committed here. Download instructions and the expected
-folder layout are in [`data/README.md`](data/README.md). The raw CMA station data
-are restricted; the quality-controlled station products used in the paper are
-included in the data archive.
+The released NetCDF and CSV products are archived at Science Data Bank under
+https://doi.org/10.57760/sciencedb.018rl and are cited by DOI. They are not committed to
+this repository. `data/README.md` gives the expected folder layout. The raw CMA station
+data are restricted; the quality-controlled station products used in the paper are part
+of the archive.
+
+## Known limitations
+
+The observation-error aggregation assumes that co-located stations have independent
+errors. A pair-difference test on the released archive does not support this assumption
+and suggests that the single-station error at the 36-km scale is larger than the 0.046
+m³ m⁻³ returned by triple collocation. Where several stations share a cell the analysis
+is therefore more confident than the evidence warrants. This is documented in the
+companion paper and in `code/validation/README.md`, and is the first item for the next
+version.
 
 ## Citation
 
-Please cite the ESSD paper and the data archive when using this code. See
-[`CITATION.cff`](CITATION.cff) (the ESSD paper DOI will be added after assignment).
+Cite the data archive DOI and the companion ESSD paper. See `CITATION.cff`.
 
-## License
+## Licence
 
-CC-BY-4.0 — see [`LICENSE`](LICENSE). No operational credentials (FTP, mail,
-CDS/Earthdata tokens) are stored in this repository.
+Code: CC BY 4.0 (see `LICENSE`). No operational credentials (FTP, mail, CDS or Earthdata
+tokens) are stored in this repository.
