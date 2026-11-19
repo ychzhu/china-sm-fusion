@@ -81,15 +81,22 @@ this repository. `data/README.md` gives the expected folder layout. The raw CMA 
 data are restricted; the quality-controlled station products used in the paper are part
 of the archive.
 
-## Known limitations
+## Notes on the error model
 
-The observation-error aggregation assumes that co-located stations have independent
-errors. A pair-difference test on the released archive does not support this assumption
-and suggests that the single-station error at the 36-km scale is larger than the 0.046
-m³ m⁻³ returned by triple collocation. Where several stations share a cell the analysis
-is therefore more confident than the evidence warrants. This is documented in the
-companion paper and in `code/validation/README.md`, and is the first item for the next
-version.
+Co-located stations have independent errors. A pair-difference test on 2,906 co-located
+pairs gives an inter-station error correlation of -0.02 (bootstrap 5-95 %: -0.07 to
++0.02), so the 1/sqrt(n) aggregation used for the cell observation error is sound.
+
+The same test shows that the point-scale repeatability of a station, about 0.066
+m^3 m^-3, is larger than the triple-collocation error of 0.046 m^3 m^-3 that enters the
+observation-error covariance. The collocation quantity is the right one when
+interpolating against a 36-km box mean, but it is not the uncertainty of an individual
+station value, and it does not depend on the separation of the pair, so the difference is
+a property of the measurements rather than of sub-grid variability. The consequence is
+that the posterior error field describes interpolation error against the box mean;
+comparisons of the analysis with single stations will show a larger discrepancy than the
+posterior error suggests. See the companion paper, Sect. 3.3 and Supplement S7.4, for the
+algebra and the distance-stratified test.
 
 ## Citation
 

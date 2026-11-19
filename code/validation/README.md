@@ -41,7 +41,8 @@ aggregates `gridObs`, not only the exported analysis.
 | `t_diag.m` | Coverage provenance: OI, background-only and missing cell-days | console |
 | `make_aerr_fig.m` | Supplementary figure of the reliability test | PNG and CSV |
 | `make_si_figs.m` | Coverage figure | PNG and CSV |
-| `make_si_fig3.m` | Within-cell station-difference figure | PNG and CSV |
+| `t_within_cell_v2.m` | Within-cell station error correlation by pair separation | PNG and CSV |
+| `make_si_fig3.m` | Earlier version of the within-cell figure; superseded by `t_within_cell_v2.m` | PNG and CSV |
 
 ## Variant tags
 
@@ -50,6 +51,36 @@ aggregates `gridObs`, not only the exported analysis.
 decay) · `SE040` `SE052` `SE060` (background-error standard deviation) ·
 `H090` `H180` (minimum history, days) · `P1` `P3` (CDF polynomial order) ·
 `M05` (minimum neighbours).
+
+## The within-cell correlation statistic
+
+For two stations sharing a cell with errors of variance sigma^2 and correlation rho, the
+root-mean-square difference is RMS = sigma * sqrt(2(1 - rho)), so
+
+    rho = 1 - (RMS/sigma)^2 / 2
+
+The factor of 2 is easy to drop and doing so produces physically impossible negative
+correlations. With the released archive, RMS = 0.0940 and the TCA sigma of 0.046 give
+rho = -0.02 (bootstrap 5-95 %: -0.07 to +0.02): the errors are independent. Setting
+rho = 0 instead gives sigma = 0.0665, which is the point-scale repeatability of a station
+and is larger than the box-mean error used in the covariance. `t_within_cell_v2.m`
+reproduces both numbers and the distance-stratified check that rules out a sub-grid
+representativeness explanation.
+
+## The within-cell correlation statistic
+
+For two stations sharing a cell with errors of variance sigma^2 and correlation rho, the
+root-mean-square difference is RMS = sigma * sqrt(2(1 - rho)), so
+
+    rho = 1 - (RMS/sigma)^2 / 2
+
+The factor of 2 is easy to drop and doing so produces physically impossible negative
+correlations. With the released archive, RMS = 0.0940 and the TCA sigma of 0.046 give
+rho = -0.02 (bootstrap 5-95 %: -0.07 to +0.02): the errors are independent. Setting
+rho = 0 instead gives sigma = 0.0665, which is the point-scale repeatability of a station
+and is larger than the box-mean error used in the covariance. `t_within_cell_v2.m`
+reproduces both numbers and the distance-stratified check that rules out a sub-grid
+representativeness explanation.
 
 ## Reproduction notes
 
