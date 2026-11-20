@@ -8,8 +8,8 @@ import pandas as pd
 import netCDF4
 
 GRID_RES = 0.18
-FALLBACK = 0.047
-SMAP_ERR_NEW = 0.046
+FALLBACK = STA_FALLBACK_ERR
+SMAP_ERR_NEW = SMAP_TCA_ERR
 
 
 def open_nc(path):

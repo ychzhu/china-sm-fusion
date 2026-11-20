@@ -2,7 +2,7 @@
 """Independent release read-back, coverage, hash and optional metric verification.
 
 Quick mode reads only the release and its validation tables. --full additionally
-recomputes direct and station-grouped CV headline metrics with the formal V2
+recomputes direct and station-grouped CV headline metrics with the formal V2.1
 kernel, using prepared intermediates in --work-dir, and asserts BASE equivalence.
 """
 from pathlib import Path
@@ -29,6 +29,9 @@ def default_release():
     for p in (Path.cwd(), *Path(__file__).resolve().parents):
         if (p / "data" / "fusion").is_dir():
             return p
+        candidate = p / "datarelease-scienceDB-v2.1"
+        if (candidate / "data" / "fusion").is_dir():
+            return candidate
         candidate = p / "datarelease-scienceDB"
         if (candidate / "data" / "fusion").is_dir():
             return candidate
@@ -47,9 +50,9 @@ def file_sha256(path):
     return digest.hexdigest()
 
 
-def refresh_report_hashes(manifest, release):
+def refresh_report_hashes(manifest, release, targets):
     """Keep self-generated verification reports consistent with the manifest."""
-    targets = {"validation/release_verification.json", "validation/verify_report.txt"}
+    targets = set(targets)
     with manifest.open(newline="", encoding="utf-8-sig") as handle:
         reader = csv.DictReader(handle)
         fieldnames = reader.fieldnames
@@ -102,12 +105,18 @@ def main():
     check("finite_range", np.all((sm[np.isfinite(sm)] >= 0) & (sm[np.isfinite(sm)] <= 1)))
     check("aerr_nonnegative", np.all(ae[np.isfinite(ae)] >= 0))
     check("aerr_matches_sm_mask", np.array_equal(np.isfinite(ae), np.isfinite(sm)))
-    check("aerr_only_with_oi", np.all(ae[np.isfinite(ae) & (flag == 0)] == 0.046))
+    check("background_error_where_no_oi", np.allclose(ae[np.isfinite(ae) & (flag == 0)], 0.046, atol=1e-7))
 
-    common = (dates != 20230101) & (dates != 20240101)
+    release_summary = json.loads((validation / "release_fusion_summary.json").read_text(encoding="utf-8"))
+    noncommon = set(int(x) for x in release_summary["noncommon_fallback_dates"])
+    common = ~np.isin(dates, list(noncommon))
+    check("common_analysis_day_count", int(common.sum()) == release_summary["common_analysis_days"], int(common.sum()))
     coverage_rows = []
     coverage = {}
-    for scope, sel in (("full_4116_days", slice(None)), ("analysis_4114_days_excluding_fallbacks", common)):
+    analysis_scope = (f"analysis_{int(common.sum())}_days_complete" if not noncommon else
+                      f"analysis_{int(common.sum())}_days_excluding_{len(noncommon)}_fallbacks")
+    scopes = [(f"full_{len(dates)}_days", slice(None)), (analysis_scope, common)]
+    for scope, sel in scopes:
         sf, af, ff = sm[sel], ae[sel], flag[sel]
         oi = ff > 0
         finite_background = (~oi) & np.isfinite(sf)
@@ -129,23 +138,39 @@ def main():
         writer.writeheader()
         writer.writerows(coverage_rows)
 
+    # Verify the complete station calendar and its CF time independently.
+    station_dir = release / "data" / "station"
+    with open_nc(station_dir / "staD10_qc_3596_20150101_20261001.nc") as ds:
+        station_time = np.asarray(ds.variables["time"][:], dtype=float)
+        station_dates = np.asarray(ds.variables["time_ymd"][:]).astype(int)
+    expected_dates = np.array([
+        int((dt.date(2015, 1, 1) + dt.timedelta(days=i)).strftime("%Y%m%d"))
+        for i in range((dt.date(2026, 10, 1) - dt.date(2015, 1, 1)).days + 1)
+    ], dtype=int)
+    check("station_complete_4292_day_axis", np.array_equal(station_dates, expected_dates), len(station_dates))
+    check("station_time_matches_time_ymd", np.array_equal(station_time, np.arange(len(expected_dates), dtype=float)))
+    raw = np.load(station_dir / "raw3596.npy", mmap_mode="r")
+    cleaned = np.load(station_dir / "cleaned3596.npy", mmap_mode="r")
+    check("station_array_shapes", raw.shape == cleaned.shape == (3596, len(expected_dates)), raw.shape)
+
     special = {}
     for text in ("2023-01-01", "2024-01-01"):
         date = int(text.replace("-", ""))
         hit = np.flatnonzero(dates == date)
-        check(text + "_present", len(hit) == 1)
-        if len(hit) != 1:
+        station_hit = np.flatnonzero(station_dates == date)
+        check(text + "_present", len(hit) == 1 and len(station_hit) == 1)
+        if len(hit) != 1 or len(station_hit) != 1:
             continue
-        i = int(hit[0])
-        finite_background = np.isfinite(sm[i]) & (flag[i] == 0)
-        values = np.unique(ae[i, finite_background])
+        i, si = int(hit[0]), int(station_hit[0])
+        raw_count = int(np.isfinite(raw[:, si]).sum())
+        qc_count = int(np.isfinite(cleaned[:, si]).sum())
         special[text] = {
-            "do_oi_sum": int(flag[i].sum()), "n_finite_sm_oi_background": int(finite_background.sum()),
-            "Aerr_at_finite_background": values.tolist(),
-            "explanation": "Station-observation analysis axis lacks this date; SMAP background remains available and is exported with do_oi=0 and Aerr=0.046 at finite background cells.",
+            "raw_reporting_stations": raw_count, "qc_valid_stations": qc_count,
+            "do_oi_sum": int(flag[i].sum()), "n_finite_sm_oi": int(np.isfinite(sm[i]).sum()),
+            "explanation": "The restored complete station calendar includes this date; valid station observations participate in the dynamic-R OI analysis.",
         }
-        check(text + "_fallback", flag[i].sum() == 0 and np.isfinite(sm[i]).sum() > 0 and
-              np.array_equal(values, np.asarray([0.046], dtype=values.dtype)))
+        check(text + "_restored_station_data", raw_count > 0 and qc_count > 0, special[text])
+        check(text + "_actual_oi", int(flag[i].sum()) > 0, int(flag[i].sum()))
 
     hash_report = {"n_entries": 0, "n_missing": 0, "n_size_mismatch": 0,
                    "n_mismatch": 0, "n_unlisted": 0}
@@ -187,7 +212,7 @@ def main():
         sys.path.insert(0, str(code_root / "python" / "full"))
         sys.path.insert(0, str(code_root / "validation"))
         from s15_sensitivity import Sensitivity
-        output = args.full_output or (args.work_dir / "verification_headline")
+        output = args.full_output or (args.work_dir / "verification_headline_v7")
         engine = Sensitivity(output)
         engine.run("BASE")
         engine.verify_base()
@@ -199,19 +224,21 @@ def main():
         "checks": checks, "coverage": coverage, "special_dates": special,
         "hash_verification": hash_report, "headline_metrics": headline,
     }
-    with (validation / "release_verification.json").open("w", encoding="utf-8") as fh:
+    json_name = "release_verification_full.json" if args.full else "release_verification.json"
+    text_name = "verify_report_full.txt" if args.full else "verify_report.txt"
+    with (validation / json_name).open("w", encoding="utf-8") as fh:
         json.dump(result, fh, ensure_ascii=False, indent=2)
     lines = ["Release verification: " + result["status"], ""]
     lines += [("%s: %s %s" % ("PASS" if c["pass"] else "FAIL", c["check"], c["detail"])).rstrip()
               for c in checks]
-    lines += ["", "Coverage (full axis / common 4,114-day axis):"]
+    lines += ["", "Coverage (full axis / common analysis axis):"]
     for row in coverage_rows:
         lines.append("%s: OI=%d (%.6f%%), finite background=%d (%.6f%%), missing=%d (%.6f%%)" %
                      (row["scope"], row["n_oi"], row["pct_oi"], row["n_finite_background"],
                       row["pct_finite_background"], row["n_missing"], row["pct_missing"]))
-    (validation / "verify_report.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (validation / text_name).write_text("\n".join(lines) + "\n", encoding="utf-8")
     if manifest.is_file() and not args.skip_checksum:
-        refresh_report_hashes(manifest, release)
+        refresh_report_hashes(manifest, release, {f"validation/{json_name}", f"validation/{text_name}"})
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if not passed:
         raise SystemExit(1)

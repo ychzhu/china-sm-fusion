@@ -18,7 +18,7 @@ cleaned=load(fullfile(P.work,'obj_clean3596.mat'),'clean'); cleaned=double(clean
 slat=load(fullfile(P.work,'lat3596.mat'),'lat'); slat=slat.lat;
 slon=load(fullfile(P.work,'lon3596.mat'),'lon'); slon=slon.lon;
 nSta=numel(slat);
-staYmd=read_ymd(P.station3596Nc);
+staYmd=station_axis_ymd();
 
 % SMAP 2-day background
 smapFile=fullfile(P.smap,'smapOI_2day_20150331_20261017.nc');

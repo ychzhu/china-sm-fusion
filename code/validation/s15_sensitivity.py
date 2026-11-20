@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""V6 parameter sensitivity using the formal V2 fold-CDF and dynamic-R kernel.
+"""V7 parameter sensitivity using the formal V2.1 fold-CDF and dynamic-R kernel.
 
-All variants use the released station-component folds and all 4,114 common days.
+All variants use the released station-component folds and the rebuilt common station-SMAP days.
 Only station-bearing targets are evaluated: non-bearing CDF grids cannot affect
 these scores, so omitting them changes runtime, not the validation definition.
 Two passes are used: variant predictions are checkpointed, then every variant is
@@ -11,7 +11,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python" / "full"))
-from paths_full import WORK, open_nc, STATION3596_NC
+from paths_full import WORK, open_nc, STATION3596_NC, STA_FALLBACK_ERR
 from cdf_utils import cdf_adjusting2
 from oi_utils import build_geometry, dynamic_oi_day
 
@@ -22,6 +22,7 @@ import os
 import warnings
 
 import numpy as np
+from numpy.polynomial.polyutils import RankWarning
 
 
 VARIANTS = {
@@ -65,7 +66,7 @@ def cdf_adjust(smap, reference, order):
     sint[left] = y[0] + (y[1] - y[0]) / (x[1] - x[0]) * (pt[left] - x[0])
     sint[right] = y[-1] + (y[-1] - y[-2]) / (x[-1] - x[-2]) * (pt[right] - x[-1])
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", np.exceptions.RankWarning)
+        warnings.simplefilter("ignore", RankWarning)
         coeff = np.polyfit(sint, np.sort(tv) - sint, order)
     out = s + np.polyval(coeff, s)
     out[(out > 1) | (out < 0)] = np.nan
@@ -186,7 +187,7 @@ class Sensitivity:
         if missing_days:
             raise AssertionError("Station archive lacks analysis dates: %s" % missing_days)
         x = x[:, [day_index[int(day)] for day in self.common_ymd]]
-        sigma = np.full(nstation, 0.047)
+        sigma = np.full(nstation, STA_FALLBACK_ERR)
         tca_path = Path(STATION3596_NC).parent / "station_tca_error_3596.csv"
         with tca_path.open(newline="", encoding="utf-8-sig") as fh:
             for row in csv.DictReader(fh):
@@ -364,7 +365,7 @@ class Sensitivity:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir", type=Path, default=Path(WORK) / "sensitivity_v6")
+    parser.add_argument("--output-dir", type=Path, default=Path(WORK) / "sensitivity_v7")
     parser.add_argument("--tags", default=",".join(VARIANTS))
     parser.add_argument("--finalize", action="store_true")
     args = parser.parse_args()

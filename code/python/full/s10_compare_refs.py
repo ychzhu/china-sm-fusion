@@ -77,6 +77,32 @@ for scope, select in (("inside", assigned), ("outside", ~assigned), ("all", np.o
 write_rows(os.path.join(WORK, "reference_station_metrics_joint.csv"),
            ["scope", "system", "mask", "N", "MAE", "RMSE", "BIAS", "CORR"], rows)
 
+# Native in-grid monthly and seasonal reference metrics for the main figures.
+# Each system retains its own finite-pair availability; no joint mask is imposed.
+obs_inside = sta_obs[assigned]
+month = np.array([int(d[4:6]) for d in common_ymd])
+season = np.array(["Winter (DJF)" if m == 12 or m <= 2 else
+                   "Spring (MAM)" if m <= 5 else
+                   "Summer (JJA)" if m <= 8 else "Autumn (SON)" for m in month])
+for filename, values, labels in (
+        ("reference_station_metrics_monthly.csv", month, list(range(1, 13))),
+        ("reference_station_metrics_seasonal.csv", season,
+         ["Winter (DJF)", "Spring (MAM)", "Summer (JJA)", "Autumn (SON)"])):
+    temporal_rows = []
+    for label in labels:
+        time_mask = values == label
+        for name, arr in systems.items():
+            pred = arr[assigned][:, time_mask]
+            obs = obs_inside[:, time_mask]
+            valid = np.isfinite(pred) & np.isfinite(obs)
+            row = {"Period": label, "scope": "inside", "system": name,
+                   "mask": "native pair availability"}
+            row.update(metrics(pred[valid], obs[valid]))
+            temporal_rows.append(row)
+    write_rows(os.path.join(WORK, filename),
+               ["Period", "scope", "system", "mask", "N", "MAE", "RMSE", "BIAS", "CORR"],
+               temporal_rows)
+
 # Gridded reference comparisons: BIAS = reference - product.
 pairs = [("ERA5_vs_SMAP_raw", era5, smap_bg), ("ERA5_vs_Fusion", era5, fusion),
          ("GLDAS_vs_SMAP_raw", gldas, smap_bg), ("GLDAS_vs_Fusion", gldas, fusion),

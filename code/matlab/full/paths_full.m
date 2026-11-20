@@ -33,9 +33,9 @@ if ~isfolder(P.work); mkdir(P.work); end
 P.station3596Nc = fullfile(P.station, 'staD10_qc_3596_20150101_20261001.nc');
 P.fusion3596Nc  = fullfile(P.fusion,  'fusion_sm_36km_3596_20150331_20261001.nc');
 
-% algorithm constants (identical to the Python authoritative chain)
+% V2.1: both fixed fallbacks use the three-decimal TCA median.
 P.smapTcaErr      = 0.046;
-P.staFallbackErr  = 0.047;
+P.staFallbackErr  = 0.046;
 P.sigmaExtreme    = 0.1074;
 P.gridRes         = 0.18;
 end

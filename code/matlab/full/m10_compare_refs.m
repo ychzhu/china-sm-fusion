@@ -16,7 +16,7 @@ fusion=load(fullfile(P.work,'fusion_full.mat'),'fusion'); fusion=fusion.fusion;
 slat=load(fullfile(P.work,'lat3596.mat'),'lat'); slat=slat.lat;
 slon=load(fullfile(P.work,'lon3596.mat'),'lon'); slon=slon.lon;
 cleaned=load(fullfile(P.work,'obj_clean3596.mat'),'clean'); cleaned=double(cleaned.clean);
-staYmd=read_ymd(P.station3596Nc);
+staYmd=station_axis_ymd();
 nSta=numel(slat); nCommon=numel(common);
 
 % station observations aligned to common

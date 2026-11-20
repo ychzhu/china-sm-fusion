@@ -87,7 +87,7 @@ for f = folds(:).'
             for q = 1:nA, dmat(q,:) = hav(la(q),lo(q),la,lo); end
             Cmat = 1.0./(V.adecay.^dmat);
             cvec = 1.0./(V.adecay.^ndk);
-            sN = errO(nb); bad = ~isfinite(sN) | sN <= 0; sN(bad) = 0.047;
+            sN = errO(nb); bad = ~isfinite(sN) | sN <= 0; sN(bad) = 0.046;
             errCon = sN/V.smapErr;
             wv = pinv(Cmat + diag(errCon.^2)) * cvec(:);
             resid = gridObs(nb,:).' - bgField(:, bearing(nb));

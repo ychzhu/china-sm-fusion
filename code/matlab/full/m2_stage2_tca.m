@@ -6,7 +6,7 @@ function m2_stage2_tca()
 P = paths_full();
 w0=warning('off','all');
 
-sYmd = read_ymd(P.station3596Nc); nDay=numel(sYmd);
+sYmd = station_axis_ymd(); nDay=numel(sYmd);
 
 clean=double(load_mat(P,'obj_clean3596.mat','clean'));
 lat=load_mat(P,'lat3596.mat','lat');

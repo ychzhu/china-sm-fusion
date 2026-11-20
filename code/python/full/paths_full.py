@@ -35,10 +35,13 @@ FUSION3596_NC = os.path.join(
     FUSION, "fusion_sm_36km_3596_20150331_20261001.nc")
 
 # key constants of the full-domain pipeline
+# V2.1: both fixed fallbacks use the three-decimal median of their
+# respective valid TCA distributions, as approved for this revision.
 SMAP_TCA_ERR = 0.046
-STA_FALLBACK_ERR = 0.047
+STA_FALLBACK_ERR = 0.046
 SIGMA_EXTREME = 0.1074
 GRID_RES = 0.18
+RELEASE_VERSION = "2.1"
 
 
 def open_nc(path):
@@ -50,11 +53,21 @@ def open_nc(path):
 
 
 def station_axis_ymd():
-    """Authoritative 4290-day station axis (2015-01-01 -> 2026-10-01), as strings."""
-    ds = open_nc(STATION3596_NC)
-    ymd = ds.variables["time_ymd"][:].astype(str)
-    ds.close()
-    return ymd
+    """Return the complete station calendar as YYYYmmdd strings.
+
+    V2.0 incorrectly treated its already-incomplete station NetCDF as the
+    date authority.  The declared calendar is now independent of that file;
+    s0_build_raw verifies every annual source column against it.
+    """
+    import datetime as dt
+    import numpy as np
+
+    start = dt.date(2015, 1, 1)
+    end = dt.date(2026, 10, 1)
+    return np.array([
+        (start + dt.timedelta(days=i)).strftime("%Y%m%d")
+        for i in range((end - start).days + 1)
+    ], dtype="U8")
 
 
 def grid_geometry():

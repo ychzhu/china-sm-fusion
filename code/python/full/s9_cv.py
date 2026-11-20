@@ -103,7 +103,7 @@ def metrics(obs, *systems):
     return out
 
 
-all_b, all_f, all_o = [], [], []
+all_b, all_f, all_o, all_aerr = [], [], [], []
 all_fold, all_grid, all_time = [], [], []
 fold_metrics = {}
 cdf_audit = []
@@ -136,6 +136,7 @@ for k in range(NFOLDS):
     Bv = fold_cdf[:, grid_v].T.copy()
     Ov = grid_obs[V].copy()
     Fv = Bv.copy()
+    Av = np.where(np.isfinite(Bv), SMAP_ERR, np.nan).astype(np.float64)
     active = []
     neighbor_lists = []
     distance_lists = []
@@ -160,10 +161,11 @@ for k in range(NFOLDS):
             obs = grid_obs[bp_safe, di]
             neighbor_bg = fold_cdf[di, bearing[bp_safe]]
             neighbor_err = grid_err_daily[bp_safe, di]
-            inc, _, _, _ = dynamic_oi_day(
+            inc, posterior, _, _ = dynamic_oi_day(
                 target_bg, obs, neighbor_bg, neighbor_err, bp_pad,
                 b_mat, c_vec, SMAP_ERR)
             Fv[active, di] = target_bg + inc
+            Av[active, di] = posterior
         print("fold %d dynamic OI targets=%d" % (k + 1, len(active)), flush=True)
 
     ok = np.isfinite(Ov) & np.isfinite(Bv) & np.isfinite(Fv)
@@ -171,6 +173,7 @@ for k in range(NFOLDS):
     all_b.append(Bv[ok])
     all_f.append(Fv[ok])
     all_o.append(Ov[ok])
+    all_aerr.append(Av[ok])
     all_fold.append(np.full(ok.sum(), k + 1, dtype=np.int16))
     all_grid.append(np.repeat(grid_v[:, None], n_days, axis=1)[ok])
     all_time.append(np.tile(np.arange(n_days, dtype=np.int32), (len(V), 1))[ok])
@@ -181,6 +184,7 @@ for k in range(NFOLDS):
 all_b = np.concatenate(all_b)
 all_f = np.concatenate(all_f)
 all_o = np.concatenate(all_o)
+all_aerr = np.concatenate(all_aerr)
 all_fold = np.concatenate(all_fold)
 all_grid = np.concatenate(all_grid)
 all_time = np.concatenate(all_time)
@@ -211,7 +215,7 @@ with open(os.path.join(WORK, "cv_fold_metrics.csv"), "w", newline="", encoding="
         for system, m in values.items():
             writer.writerow([fold, system, m["N"], m["MAE"], m["RMSE"], m["BIAS"], m["CORR"]])
 np.savez(os.path.join(WORK, "cv_results_full.npz"),
-         allB=all_b, allF=all_f, allO=all_o, sample_fold=all_fold,
+         allB=all_b, allF=all_f, allO=all_o, allAerr=all_aerr, sample_fold=all_fold,
          sample_grid=all_grid, sample_time=all_time, fold_of=fold_of,
          component_of=component_of)
 print("===== strict station-grouped 10-fold CV =====")

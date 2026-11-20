@@ -7,6 +7,10 @@ errors and/or point-scale representativeness; these terms are not identifiable
 from this archive alone. Uncertainty is bootstrapped by grid cell, not by pair.
 """
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python" / "full"))
+from paths_full import STA_FALLBACK_ERR
 import argparse
 import csv
 import json
@@ -66,7 +70,7 @@ def main():
     if x.shape[0] != len(slat):
         x = x.T
 
-    sigma = np.full(len(slat), 0.047, dtype=float)
+    sigma = np.full(len(slat), STA_FALLBACK_ERR, dtype=float)
     with (release / "data" / "station" / "station_tca_error_3596.csv").open(newline="", encoding="utf-8-sig") as fh:
         for row in csv.DictReader(fh):
             value = float(row["station_sigma"])

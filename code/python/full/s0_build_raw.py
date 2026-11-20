@@ -1,22 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Build the full 3596-station raw matrix (authoritative 4290-day axis)."""
+"""Build the 3596-station raw matrix on the complete 4292-day calendar."""
 from paths_full import *
 
 import glob
+import json
 import os
 import numpy as np
 import pandas as pd
 import netCDF4
 
 
-# authoritative day axis from the released 3596 station product
+# Complete declared calendar; never infer it from a potentially incomplete NC.
 axis_ymd = station_axis_ymd().tolist()
 n_days = len(axis_ymd)
 day_pos = {d: k for k, d in enumerate(axis_ymd)}
-print("authoritative day axis:", n_days, axis_ymd[0], "->", axis_ymd[-1])
+print("declared complete day axis:", n_days, axis_ymd[0], "->", axis_ymd[-1])
 
 # gather stations across the 12 yearly CSVs
-files = sorted(glob.glob(os.path.join(STATION, "staD10_yearly", "staD10_2*.csv")))
+source_dir = os.environ.get("SM_STATION_SOURCE_DIR", os.path.join(STATION, "staD10_yearly"))
+files = sorted(glob.glob(os.path.join(source_dir, "staD10_2*.csv")))
+if not files:
+    raise FileNotFoundError(
+        f"No annual station CSVs in {source_dir}; set SM_STATION_SOURCE_DIR to the authoritative source tables")
 meta = {}
 raw = None
 for fi, f in enumerate(files):
@@ -43,22 +48,55 @@ print("unique stations:", n_sta)
 
 raw = np.full((n_sta, n_days), np.nan, dtype=np.float32)
 present_year = np.zeros((n_sta, len(files)), dtype=bool)
+source_audit = []
 for yi, f in enumerate(files):
     d = pd.read_csv(f, na_values=["--", ""])
     dcols = [c for c in d.columns if c.startswith("D")]
+    source_dates = [c[1:] for c in dcols]
+    if len(source_dates) != len(set(source_dates)):
+        raise ValueError(f"Duplicate daily columns in {f}")
+    years = sorted({x[:4] for x in source_dates})
+    expected = {x for x in axis_ymd if x[:4] in years}
+    unknown = sorted(set(source_dates) - set(day_pos))
+    missing = sorted(expected - set(source_dates))
+    if unknown or missing:
+        raise ValueError(
+            f"Annual source calendar mismatch in {os.path.basename(f)}: "
+            f"unknown={unknown[:10]}, missing={missing[:10]}")
     ids = d["Station_ID_d"].astype(int).to_numpy()
     X = d[dcols].to_numpy(float)
-    col_idx = np.array([day_pos[c[1:]] if c[1:] in day_pos else -1 for c in dcols])
-    keep_cols = col_idx >= 0
-    X = X[:, keep_cols]
-    col_idx = col_idx[keep_cols]
+    col_idx = np.array([day_pos[x] for x in source_dates], dtype=int)
     rows = np.array([sta_pos[s] for s in ids])
     present_year[rows, yi] = True
-    # fill raw (only finite values)
+    # Fill raw only where a source observation is finite.  Every source date
+    # has already been validated, so no date can be silently discarded.
     for ri, rr in enumerate(rows):
         vals = X[ri]
         fin = np.isfinite(vals)
         raw[rr, col_idx[fin]] = vals[fin]
+    source_audit.append({
+        "file": os.path.basename(f), "years": years,
+        "n_source_days": len(source_dates), "n_expected_days": len(expected),
+        "n_station_rows": int(len(ids)),
+        "n_finite_source_values": int(np.isfinite(X).sum()),
+        "calendar_complete": True,
+    })
+
+raw_daily = np.isfinite(raw).sum(axis=0)
+pd.DataFrame({"date": axis_ymd, "raw_reporting_stations": raw_daily}).to_csv(
+    os.path.join(WORK, "station_raw_daily_counts.csv"), index=False)
+audit = {
+    "axis_start": axis_ymd[0], "axis_end": axis_ymd[-1], "n_days": n_days,
+    "calendar_rule": "inclusive daily calendar derived from declared start/end",
+    "source_files": source_audit,
+    "restored_dates": {
+        x: int(raw_daily[day_pos[x]]) for x in ("20230101", "20240101")
+    },
+    "raw_finite_values": int(np.isfinite(raw).sum()),
+}
+with open(os.path.join(WORK, "station_axis_audit.json"), "w", encoding="utf-8") as fh:
+    json.dump(audit, fh, ensure_ascii=False, indent=2)
+print("restored raw reporting counts:", audit["restored_dates"], flush=True)
 
 print("raw finite values:", np.isfinite(raw).sum())
 print("raw range: %.4f .. %.4f" % (np.nanmin(raw), np.nanmax(raw)))

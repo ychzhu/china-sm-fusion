@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Export V2 fusion NetCDF with posterior Aerr and actual daily OI flags."""
+"""Export V2.1 fusion NetCDF with posterior Aerr and actual daily OI flags."""
 from paths_full import *
 from oi_utils import build_geometry
 
@@ -49,7 +49,9 @@ common_rows = np.array([int(np.where(time_ymd == d)[0][0]) for d in common_int])
 sm_full[common_rows] = np.clip(fusion, 0.0, 0.7).astype(np.float32)
 aerr_full[common_rows] = aerr.astype(np.float32)
 
-# Two dates outside the common station/SMAP analysis axis are explicit raw-SMAP fallback days.
+# Dates outside the common station/SMAP analysis axis, if any, retain raw SMAP.
+# The rebuilt V2.1 calendar has no non-common dates, but the generic policy is
+# retained for future temporal extensions rather than hard-coding two dates.
 noncommon = np.setdiff1d(np.arange(n_time), common_rows)
 if len(noncommon):
     smap = open_nc(os.path.join(SMAP, "smapOI_2day_20150331_20261017.nc"))
@@ -117,7 +119,7 @@ try:
     sm.long_name = "daily surface soil moisture fused by dynamic-error optimal interpolation"
     sm.units = "m3 m-3"
     sm.valid_range = np.array([0.0, 0.7], dtype=np.float32)
-    sm.comment = "CDF-adjusted SMAP plus OI where daily station information is available; raw SMAP fallback on non-common-axis dates"
+    sm.comment = "CDF-adjusted SMAP plus OI where daily station information is available; non-updated cells retain the available background"
     ae = out.createVariable("Aerr", "f4", ("time", "grid"), zlib=True,
                             complevel=4, shuffle=True, fill_value=fill,
                             chunksizes=(30, n_grid))
@@ -131,11 +133,16 @@ try:
     do.flag_meanings = "background_only daily_station_information_applied"
     for attr, value in global_attrs.items():
         out.setncattr(attr, value)
-    out.setncattr("title", "China 36 km daily surface soil moisture fusion dataset, Version 2.0")
-    out.setncattr("version", "2.0")
+    out.setncattr("title", f"China 36 km daily surface soil moisture fusion dataset, Version {RELEASE_VERSION}")
+    out.setncattr("version", RELEASE_VERSION)
     out.setncattr("oi_model", "dynamic daily observation R and standard posterior Aerr; a=10; R=1.08 degrees; MAX_NEAR=9")
-    out.setncattr("analysis_axis", "4114 common station-SMAP days; full product axis 4116 days")
-    out.setncattr("noncommon_date_policy", "raw SMAP 2-day background, Aerr=0.046 where finite, do_oi=0")
+    out.setncattr("analysis_axis", f"{len(common)} common station-SMAP days; full product axis {n_time} days")
+    out.setncattr("station_background_error_fallback", STA_FALLBACK_ERR)
+    out.setncattr("station_fallback_basis", "three-decimal median of valid station TCA error estimates")
+    if len(noncommon):
+        out.setncattr("noncommon_date_policy", "raw SMAP 2-day background, Aerr=0.046 where finite, do_oi=0")
+    else:
+        out.setncattr("noncommon_date_policy", "none; all product dates belong to the common station-SMAP analysis axis")
     out.setncattr("date_created", datetime.datetime.now(datetime.timezone.utc).isoformat())
     sm[:] = np.ma.masked_invalid(sm_full)
     ae[:] = np.ma.masked_invalid(aerr_full)
@@ -149,7 +156,7 @@ finally:
 valid_sm = np.isfinite(sm_full)
 valid_ae = np.isfinite(aerr_full)
 summary = {
-    "file": str(source_path), "version": "2.0", "days": int(n_time),
+    "file": str(source_path), "version": RELEASE_VERSION, "days": int(n_time),
     "common_analysis_days": int(len(common)), "noncommon_fallback_dates": time_ymd[noncommon].astype(int).tolist(),
     "grids": int(n_grid), "finite_sm": int(valid_sm.sum()),
     "actual_oi_grid_days": int(do_full.sum()),

@@ -18,7 +18,7 @@ seasonNames={'DJF','MAM','JJA','SON'};
 seasonMonths={[12,1,2],[3,4,5],[6,7,8],[9,10,11]};
 growing=[false,true,true,true];
 
-axisYmd = read_ymd(P.station3596Nc);
+axisYmd = station_axis_ymd();
 nDay = numel(axisYmd);
 yrAll = cellfun(@(s) str2double(s(1:4)), axisYmd);
 moAll = cellfun(@(s) str2double(s(5:6)), axisYmd);

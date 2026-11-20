@@ -1,14 +1,11 @@
 # Processing code for the China 36 km daily soil-moisture fusion dataset
 
-This folder contains the two equivalent, self-contained implementations of the
-full-domain (3,596-station) three-stage quality-control and fusion pipeline that
-produced the dataset and every number reported in the accompanying paper:
+This folder contains the Python production implementation and a stage-by-stage MATLAB port of the full-domain (3,596-station) three-stage quality-control and fusion pipeline:
 
 - a **Python** implementation in `python/full/`, and
 - a **MATLAB** implementation in `matlab/full/` that mirrors it stage by stage.
 
-Both chains run the same eleven stages and produce the same products and metrics
-(any differences are limited to last-digit floating-point accumulation).
+The Python implementation is authoritative for the V2.1 release and every number in the revised paper. The MATLAB implementation mirrors the same production stages; its calendar and station-error fallback have been updated for V2.1, but an end-to-end MATLAB rerun is not claimed in this revision.
 
 ## Repository layout
 
@@ -16,14 +13,15 @@ Both chains run the same eleven stages and produce the same products and metrics
 code/
 ├── python/full/              authoritative Python pipeline (s0 -> s10)
 │   ├── paths_full.py         shared locations, constants, in-memory netCDF helper
-│   ├── s0_build_raw.py       build the 3596 x 4290 raw matrix from yearly CSVs
+│   ├── s0_build_raw.py       build the 3596 x 4292 raw matrix on a continuous calendar from yearly CSVs
 │   ├── s1_stage1.py          objective hard-fault screening (no error estimate)
 │   ├── s2_stage2_tca.py      Triple Collocation error estimation
 │   ├── s3_stage3.py          sigma-driven decisions (extreme threshold 0.1074)
+│   ├── s3b_export_station.py export the 4292-day station NetCDF, arrays and QC tables
 │   ├── s4_grid_agg.py        station -> grid aggregation, rho=0 cell errors
 │   ├── s5_neighbors.py       deterministic capped neighbour selection
 │   ├── s6_cdf.py             rank-based CDF adjustment of the SMAP background
-│   ├── s7_fusion.py          static-weight OI fusion
+│   ├── s7_fusion.py          daily dynamic-error OI and standard posterior Aerr
 │   ├── s8_eval_direct.py     in-sample pooled evaluation
 │   ├── s9_cv.py              10-fold spatial cross-validation
 │   ├── s10_compare_refs.py   five-system reference comparison
@@ -83,6 +81,6 @@ run_pipeline_full
 
 | Stage | Metric | Value |
 |---|---|---|
-| s8 / m8 in-sample | Fusion MAE / CORR | 0.0323 / 0.8767 |
-| s9 / m9 10-fold CV | OI MAE (background 0.0714) | 0.0644 (9.8% improvement) |
-| s10 / m10 comparison | Fusion MAE / CORR (best of five systems) | 0.0461 / 0.7917 |
+| s8 / m8 direct grid-cell diagnostic | Fusion MAE / CORR | 0.033851 / 0.865114 (N = 5,003,186; in-sample) |
+| s9 / m9 strict station-grouped 10-fold CV | Fusion MAE / CORR | 0.068362 / 0.576726 (background MAE 0.075254; 9.16% MAE reduction; N = 5,006,022) |
+| s10 / m10 native in-grid comparison | Fusion MAE / CORR | 0.045562 / 0.798390 (N = 7,232,510) |

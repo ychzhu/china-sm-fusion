@@ -1,12 +1,12 @@
 function m0_build_raw()
-%M0_BUILD_RAW  Build the 3596-station raw matrix (authoritative 4290-day axis).
+%M0_BUILD_RAW  Build the 3596-station raw matrix (complete 4292-day axis).
 %   MATLAB port of s0_build_raw.py. Reads the 12 yearly station CSVs and
 %   gathers every station onto the released 3596 day axis.
 
 P = paths_full();
 
-% authoritative day axis from the released 3596 station product
-axisYmd = read_ymd(P.station3596Nc);
+% Complete declared calendar; do not infer dates from a legacy NetCDF.
+axisYmd = station_axis_ymd();
 nDay = numel(axisYmd);
 dayPos = containers.Map(axisYmd, 1:nDay);
 fprintf('authoritative day axis: %d %s -> %s\n', nDay, axisYmd{1}, axisYmd{end});
@@ -53,7 +53,9 @@ for yi = 1:nYear
     presentYear(rows, yi) = true;
     for c = 1:numel(dcols)
         dn = dcols{c}(2:end);
-        if ~dayPos.isKey(dn); continue; end
+        if ~dayPos.isKey(dn)
+            error('Station source date %s is outside the declared calendar in %s', dn, files(yi).name);
+        end
         cj = dayPos(dn);
         vals = double(d.(dcols{c}));
         fin = isfinite(vals);

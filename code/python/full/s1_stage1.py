@@ -8,10 +8,28 @@ dilute the neighbor reporting fraction.
 from paths_full import *
 
 import os
+import warnings
 import numpy as np
 import pandas as pd
 import netCDF4
 from scipy.spatial import cKDTree
+
+
+def _nanmean_empty_ok(values, axis=None):
+    """NaN mean where an entirely unreported neighbour window is valid input."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Mean of empty slice", category=RuntimeWarning)
+        warnings.filterwarnings("ignore", message="Degrees of freedom <= 0 for slice", category=RuntimeWarning)
+        with np.errstate(all="ignore"):
+            return np.nanmean(values, axis=axis)
+
+
+def _nanstd_empty_ok(values, axis=None):
+    """NaN std with the same explicit all-missing-window handling."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Degrees of freedom <= 0 for slice", category=RuntimeWarning)
+        with np.errstate(all="ignore"):
+            return np.nanstd(values, axis=axis)
 
 
 NEIGH_RADIUS = 0.75
@@ -89,8 +107,7 @@ for yi, yr in enumerate(years):
         growing_stuck = False
         nmean_full = None
         if has_nbr:
-            with np.errstate(all="ignore"):
-                nmean_full = np.nanmean(raw[np.array(nbr)][:, ymask], axis=0)
+            nmean_full = _nanmean_empty_ok(raw[np.array(nbr)][:, ymask], axis=0)
         for sn, mlist in SEASONS.items():
             msel = np.isin(month[ymask], mlist)
             if msel.sum() == 0:
@@ -115,7 +132,7 @@ for yi, yr in enumerate(years):
                     reasons.append("winter_freeze")
                 elif sn in GROWING:
                     if has_nbr:
-                        if np.nanstd(nmean_full[msel][valid]) > NEIGH_ACTIVE_STD:
+                        if _nanstd_empty_ok(nmean_full[msel][valid]) > NEIGH_ACTIVE_STD:
                             growing_stuck = True
                             reasons.append("growing_stuck_" + sn)
                     else:
@@ -133,8 +150,7 @@ for yi, yr in enumerate(years):
 
         l2_fail = False
         if has_nbr:
-            with np.errstate(all="ignore"):
-                mean3 = np.nanmean(x) - np.nanmean(nmean_full)
+            mean3 = _nanmean_empty_ok(x) - _nanmean_empty_ok(nmean_full)
             if not (L2_MEAN_LO <= mean3 <= L2_MEAN_HI):
                 bothm = reported & np.isfinite(nmean_full)
                 if bothm.sum() >= 2 and np.std(x[bothm]) > 0 and np.std(nmean_full[bothm]) > 0:
