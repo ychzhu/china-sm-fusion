@@ -57,21 +57,22 @@ data/                     extracted release (git-ignored; see data/README.md)
 
 | Result | Script |
 |---|---|
-| Main tables 1–4, 6 and the panels of Figs. 3–9 | `code/python/full/run_pipeline_full.py` (s8–s10) |
-| Table 5, parameter sensitivity (21 variants) | `code/validation/sens_all.m` |
-| Table 6 and Tables S5–S6, strict CV | `code/validation/t_cv_official3.m` |
-| Tables S9 and Fig. S4, posterior error reliability | `code/validation/t_aerr.m` |
-| Fig. S1, coverage | `code/validation/make_si_figs.m` |
-| Fig. S2, within-cell station differences | `code/validation/make_si_fig3.m` |
+| Table 1, native-grid direct evaluation, and Table 3, annual metrics | `code/python/full/s8_eval_direct.py` |
+| Table 2 and Tables S5–S6, strict station-grouped CV | `code/python/full/s9_cv.py` |
+| Table 4, seasonal metrics, and Table 5/Fig. 7, neighbour-density strata | `code/python/full/s12_stratified_metrics.py` |
+| Table 6 and Table S7, BASE plus 22 sensitivity variants | `code/validation/s15_sensitivity.py` |
+| Tables S9 and Fig. S4, posterior error reliability | Released Aerr decile tables and `code/validation/make_v6_figures.py` |
+| Fig. S1, coverage | `code/validation/make_v6_figures.py` and `validation/coverage_summary.csv` |
+| Fig. S2, within-cell station differences | `code/validation/within_cell_diagnostics.py` and `make_v6_figures.py` |
+| Fig. S3, H–L background-error structure | Released H–L tables and `code/validation/make_v6_figures.py` |
+| Final release read-back and full headline-metric recomputation | `code/validation/verify_release.py` |
 
-The sensitivity scripts need the intermediate matrices produced by stages s0–s5; see
-`code/validation/README.md` for the exact prerequisites and for the variant tags.
+The sensitivity scripts need the intermediate products produced by stages s0–s5 and a separate writable work directory. See `code/validation/README.md` for the exact conventions, common-mask scoring, variant tags, and the status of legacy MATLAB scripts.
 
 ## Requirements
 
-- **Python** 3.9+ with numpy, scipy, pandas, netCDF4 and h5py. No MATLAB is required.
-- **MATLAB** R2022b or later for the MATLAB port and the sensitivity scripts. Only base
-  functions are used apart from `lib/cdf_adjusting2.m`.
+- **Python** 3.9+ with numpy, scipy, pandas, netCDF4 and h5py. No MATLAB is required for the production pipeline or V6 validation.
+- **MATLAB** R2022b or later is optional for the historical MATLAB port. Legacy MATLAB sensitivity scripts are retained for traceability but do not define the V6 results.
 
 ## Data availability
 
@@ -83,20 +84,9 @@ of the archive.
 
 ## Notes on the error model
 
-Co-located stations have independent errors. A pair-difference test on 2,906 co-located
-pairs gives an inter-station error correlation of -0.02 (bootstrap 5-95 %: -0.07 to
-+0.02), so the 1/sqrt(n) aggregation used for the cell observation error is sound.
+Production OI treats co-located station errors as independent; this is an explicit approximation, not a conclusion established by the pair-difference test. The V6 diagnostic evaluates 2,906 co-located pairs with station-specific TCA errors and a 2,000-replicate grid-cluster bootstrap. The median standardized pair RMS is 1.235182 (95% interval 1.193845–1.264823), and the nearest 500 pairs give 1.213708. Observed pair differences therefore exceed the independent-TCA expectation, including at short separation.
 
-The same test shows that the point-scale repeatability of a station, about 0.066
-m^3 m^-3, is larger than the triple-collocation error of 0.046 m^3 m^-3 that enters the
-observation-error covariance. The collocation quantity is the right one when
-interpolating against a 36-km box mean, but it is not the uncertainty of an individual
-station value, and it does not depend on the separation of the pair, so the difference is
-a property of the measurements rather than of sub-grid variability. The consequence is
-that the posterior error field describes interpolation error against the box mean;
-comparisons of the analysis with single stations will show a larger discrepancy than the
-posterior error suggests. See the companion paper, Sect. 3.3 and Supplement S7.4, for the
-algebra and the distance-stratified test.
+Station-error correlation and point-scale representativeness differences cannot be separately identified from these data. An equal-variance diagnostic inversion produces many physically invalid correlations and is not used in production. The earlier V5 claim that a pooled inversion near zero demonstrates independence is withdrawn. The posterior error field describes interpolation error against the box mean under the stated covariance approximation; comparison with individual stations also contains point-scale representativeness differences. See the companion paper, Sect. 3.3 and Supplement S7.4, and `code/validation/within_cell_diagnostics.py` for the algebra and diagnostics.
 
 ## Citation
 

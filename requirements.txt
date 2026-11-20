@@ -14,5 +14,9 @@ requests>=2.28,<3
 matplotlib>=3.7
 Pillow>=10
 
+# Optional: DOCX/PDF structural audit (audit_v6_documents.py).
+PyMuPDF>=1.24
+python-docx>=1.1
+
 # Tested with Python 3.9-3.12 on Linux and Windows. The MATLAB port needs
 # R2022b or later and no Python at all.

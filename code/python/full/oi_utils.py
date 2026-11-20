@@ -52,7 +52,7 @@ def dynamic_oi_day(target_bg, obs, neighbor_bg, neighbor_err, bp_pad,
     system[:, diag, diag] += ratio ** 2
     c_eff = np.where(usable, c_vec, 0.0)
     try:
-        weights = np.linalg.solve(system, c_eff)
+        weights = np.linalg.solve(system, c_eff[..., None])[..., 0]
     except np.linalg.LinAlgError:
         weights = np.einsum("nij,nj->ni", np.linalg.pinv(system), c_eff)
     residual = np.where(usable, obs - neighbor_bg, 0.0)

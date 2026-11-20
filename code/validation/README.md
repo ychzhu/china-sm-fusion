@@ -1,96 +1,81 @@
-# Sensitivity and reliability scripts
+# V6 validation, sensitivity, and delivery scripts
 
-These scripts sit on top of the authoritative pipeline in `code/matlab/full` and
-reproduce the sensitivity analysis, the cross-validation re-run and the posterior
-error reliability test reported in the companion paper.
+This directory contains the reproducible validation used for the V6 manuscript and the V2 data-release read-back. The production configuration is unchanged: 1.08° search radius, at most 9 neighbours, at least 3 neighbours, `a=10`, `sigma_b=0.046`, minimum history 30 days, quadratic CDF matching, and `rho=0` in the OI covariance model.
 
-They were run with **MATLAB R2022b** on the released intermediate products. Every
-script expects `paths_full()` on the path and reads `work_full/` from
-`code/matlab/full`, so either run them from a copy placed next to that folder or
-add both directories to the path.
+## Current V6 scripts
 
-## Preparatory step
-
-`sens_*` works on the intermediate matrices produced by stages m0–m5 of the
-authoritative chain (`raw3596.mat`, `obj_clean3596.mat`, `tca3596.csv`,
-`grid_prep_full.mat`, `neighbors_full.mat`). Run those stages once:
-
-```
-run_pipeline_full      % or call m0_build_raw ... m5_neighbors individually
-```
-
-If you start from the released products instead, `grid_prep_full.mat` must be
-rebuilt by `m4_grid_agg` because the sensitivity sweep needs the daily cell
-aggregates `gridObs`, not only the exported analysis.
-
-## Files
-
-| Script | Purpose | Output |
+| Script | Purpose | Principal outputs |
 |---|---|---|
-| `sens_geo_build.m` | Neighbour superset over a ±1.62° box, sorted by distance | `sens_geo_R162K48.mat` |
-| `sens_prep.m` | Defines the fixed scoring domain (4,689 cells) | `sens_base_domain.mat` |
-| `sens_cdf.m` | Stage A: neighbour selection and CDF correction for one variant | `senscdf_<tag>.mat` |
-| `sens_oi.m` | Stage B: static OI weights, daily fusion, in-sample diagnostics | `sensoi_<tag>.mat` |
-| `sens_cv.m` | Stage C: strict station-grouped CV for one variant | `senscv_<tag>.mat` |
-| `sens_all.m` | Driver: the 21 variants of Table 5 | `sens_summary.csv` |
-| `sens_table.m` | Collects the sweep into one CSV | `sens_summary.csv` |
-| `cdf_cell.m` | CDF transfer function with a settable polynomial order | — |
-| `t_cv_official3.m` | Strict CV with fold-specific CDF reconstruction over all grid cells | `cv3_<mode>.mat` |
-| `t_aerr.m` | Reliability of the posterior error against held-out truth | `aerr_reliability.mat` |
-| `t_verify.m` | Compares the re-run analysis with the released `fusion_full.mat` | console |
-| `t_diag.m` | Coverage provenance: OI, background-only and missing cell-days | console |
-| `make_aerr_fig.m` | Supplementary figure of the reliability test | PNG and CSV |
-| `make_si_figs.m` | Coverage figure | PNG and CSV |
-| `t_within_cell_v2.m` | Within-cell station error correlation by pair separation | PNG and CSV |
-| `make_si_fig3.m` | Earlier version of the within-cell figure; superseded by `t_within_cell_v2.m` | PNG and CSV |
+| `verify_release.py` | NetCDF structure, finite-value partitions, update flags, fallback dates, SHA-256 manifest, and optional full metric recomputation | `release_verification.json`, `verify_report.txt` |
+| `rebuild_manifest.py` | Hash every release file except the manifest itself | `validation/SHA256SUMS.csv` |
+| `build_release_zip.py` | Build the release ZIP and independently verify CRC, membership, and packed-file hashes | Release ZIP and `PACKAGE_QA.json` |
+| `within_cell_diagnostics.py` | Standardized paired differences, grid-cluster bootstrap, distance strata, and diagnostic equal-variance inversion | `within_cell_pairs.csv`, `within_cell_distance.csv`, `within_cell_summary.json` |
+| `s15_sensitivity.py` | V2 sensitivity using fold-specific CDFs, dynamic daily errors, and `dynamic_oi_day` | Variant checkpoints and common-mask summary tables |
+| `make_v6_figures.py` | Seven regenerated quantitative figures from authoritative release tables | PDF/PNG/SVG/TIFF figures and QA inputs |
+| `prepare_v6_word.py` | Deterministically prepare citation-keyed Word sources and insert the 9 main and 5 SI figures | `manuscript_word.md`, `supplement_word.md` |
+| `audit_v6_documents.py` | Audit citations, DOCX table/figure counts, unresolved placeholders, and PDF structure | `WORD_PDF_QA.json` |
 
-## Variant tags
+The quantitative scripts use the released data and authoritative validation tables rather than recalculating production fusion without evidence. Set `SM_DATA_DIR` to the extracted release's `data` directory and `SM_WORK_DIR` to a separate writable analysis directory when running the full Python pipeline.
 
-`BASE` (published settings) · `R070` `R090` `R126` `R144` (search box, degrees) ·
-`K03` `K06` `K15` `K24` (neighbour cap) · `A03` `A05` `A20` `A30` (background-error
-decay) · `SE040` `SE052` `SE060` (background-error standard deviation) ·
-`H090` `H180` (minimum history, days) · `P1` `P3` (CDF polynomial order) ·
-`M05` (minimum neighbours).
+## Release verification
 
-## The within-cell correlation statistic
+Quick verification checks the release structure and every manifest entry, including files not listed in the manifest:
 
-For two stations sharing a cell with errors of variance sigma^2 and correlation rho, the
-root-mean-square difference is RMS = sigma * sqrt(2(1 - rho)), so
+```bash
+python code/validation/verify_release.py --release-root /path/to/datarelease-scienceDB
+```
 
-    rho = 1 - (RMS/sigma)^2 / 2
+For a staged rebuild, full numerical verification can be run before final manifest generation:
 
-The factor of 2 is easy to drop and doing so produces physically impossible negative
-correlations. With the released archive, RMS = 0.0940 and the TCA sigma of 0.046 give
-rho = -0.02 (bootstrap 5-95 %: -0.07 to +0.02): the errors are independent. Setting
-rho = 0 instead gives sigma = 0.0665, which is the point-scale repeatability of a station
-and is larger than the box-mean error used in the covariance. `t_within_cell_v2.m`
-reproduces both numbers and the distance-stratified check that rules out a sub-grid
-representativeness explanation.
+```bash
+python code/validation/verify_release.py \
+  --release-root /path/to/datarelease-scienceDB \
+  --work-dir /path/to/writable-work \
+  --full --full-output /path/to/full-metrics \
+  --skip-checksum
+python code/validation/rebuild_manifest.py --release-root /path/to/datarelease-scienceDB
+python code/validation/verify_release.py --release-root /path/to/datarelease-scienceDB
+```
 
-## The within-cell correlation statistic
+`--skip-checksum` is an explicit staged-build option. A report produced with that option is not a final SHA-256 pass. The final quick run must be repeated after manifest regeneration. After writing its JSON and text reports, the verifier refreshes only those two report rows in the manifest, preventing self-generated reports from invalidating their own hashes.
 
-For two stations sharing a cell with errors of variance sigma^2 and correlation rho, the
-root-mean-square difference is RMS = sigma * sqrt(2(1 - rho)), so
+Create and read back the distributable ZIP after the final quick verification:
 
-    rho = 1 - (RMS/sigma)^2 / 2
+```bash
+python code/validation/build_release_zip.py \
+  --release-root /path/to/datarelease-scienceDB \
+  --output /path/to/china_sm_36km_v2.0.zip \
+  --audit-output /path/to/PACKAGE_QA.json
+```
 
-The factor of 2 is easy to drop and doing so produces physically impossible negative
-correlations. With the released archive, RMS = 0.0940 and the TCA sigma of 0.046 give
-rho = -0.02 (bootstrap 5-95 %: -0.07 to +0.02): the errors are independent. Setting
-rho = 0 instead gives sigma = 0.0665, which is the point-scale repeatability of a station
-and is larger than the box-mean error used in the covariance. `t_within_cell_v2.m`
-reproduces both numbers and the distance-stratified check that rules out a sub-grid
-representativeness explanation.
+The package builder rechecks every source hash, requires saved quick and full verification reports to be PASS, tests ZIP CRCs and membership, and recomputes every listed file hash from the ZIP itself.
 
-## Reproduction notes
+## Within-cell station diagnostics
 
-`t_cv_official3.m` reads `validation/cv_fold_assignments.csv` from the released
-data archive. Point `SM_DATA_DIR` at the extracted archive and place that one CSV
-at `<repo>/datarelease-scienceDB/validation/cv_fold_assignments.csv`, or edit the
-path in the script.
+The V6 diagnostic does not infer a physical correlation from a single pooled RMS value under an equal-variance assumption. For each station pair it calculates
 
-The fold-level CDF application counts printed by `t_cv_official3.m` reproduce the
-ten values in `validation/cv_station_grouped_summary.json` exactly
-(4,560 / 4,537 / 4,519 / 4,467 / 4,515 / 4,547 / 4,364 / 4,544 / 4,558 / 4,526).
-The pooled metrics agree to about 1 %, the residual difference coming from the
-handling of missing neighbour observations.
+`RMS(difference) / sqrt(sigma_i^2 + sigma_j^2)` using station-specific TCA errors, then bootstraps grid cells rather than treating pairs as independent.
+
+Across 2,906 pairs in 641 grid cells, the median standardized RMS is 1.235182 (grid-cluster bootstrap 95% interval 1.193845–1.264823, 2,000 replicates). The nearest 500 pairs give 1.213708. Thus observed differences exceed the independent-TCA expectation even at short separation.
+
+Station correlation and point-scale representativeness differences are not separately identifiable from these data. The diagnostic equal-variance inversion yields a median implied correlation of −0.581083 and 38.1624% of estimates outside [−1,1]; it is therefore not used for production or interpreted as a physical estimate. The V5 claim that `rho=-0.02` demonstrates independence is withdrawn.
+
+## Formal V2 sensitivity
+
+`s15_sensitivity.py` reuses the production Python V2 implementation, including fold-specific CDF matching, dynamic daily observation errors, and `dynamic_oi_day`. It evaluates BASE and 22 variants over all 4,114 analysis days. Scoring uses a common finite mask so that changes in sample availability are not mistaken for parameter effects.
+
+On the common CV mask, BASE reduces MAE by 9.1967799%. K15 and K24 give 10.30200% and 10.77461%, while RHO020 and RHO050 give 9.09555% and 8.94722%. These diagnostics do not by themselves justify replacing the documented production configuration or regenerating the released product.
+
+K03 has no eligible OI targets in strict CV. Its common CSV background and fusion values are equal because of background fallback; this must not be described as a validated 0% OI improvement.
+
+## Legacy MATLAB scripts
+
+The `sens_*`, `t_cv_official3.m`, `t_aerr.m`, and related MATLAB scripts are retained for historical traceability. Their three-day stepping, static-error, full-sample-CDF, or zero-filled-neighbour conventions do not define the V6 sensitivity results. `t_within_cell_v2.m` and `make_si_fig3.m` are superseded for the within-cell interpretation by `within_cell_diagnostics.py`.
+
+Use the current Python scripts and the released common-mask CSV/JSON files when checking V6 manuscript claims. Do not mix legacy outputs with the V6 Table 6 or SI S7.4 statistics.
+
+## Figures and documents
+
+`make_v6_figures.py` writes final quantitative figures; the editable Fig. 2 workflow is supplied separately as SVG. Figure QA includes source preflight, minimum text size, collision and alignment checks, and rendered-image review.
+
+`prepare_v6_word.py` reads the authoritative `paper/delivery_v6_final/source/manuscript.md` and `supplement.md`. It must not be run in reverse: the Word-specific Markdown files are generated derivatives, not the scientific source of truth. DOCX export uses `md-to-word`, `source/format.txt`, the 19-entry DOI-backed BibTeX file, and the Copernicus CSL. `audit_v6_documents.py` checks the generated DOCX/PDF deliverables after actual PDF rendering.
